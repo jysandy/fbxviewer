@@ -17,6 +17,7 @@ namespace FBXViewer
 	{
 		bool foo = D3dtut::D3DApp::Init();
 
+		//TODO: Add your filenames and texture filenames here.
 		filenames.push_back("roc_body.FBX");
 		textureFilenames.push_back(L"roc_body.png");
 		filenames.push_back("roc_wing.FBX");
@@ -187,7 +188,6 @@ namespace FBXViewer
 			{
 				FbxAMatrix& worldMatrix = child->EvaluateGlobalTransform();
 				DirectX::XMFLOAT4X4 world;
-				//mesh->GenerateNormals();
 				for (int k = 0; k < 4; k++)
 				{
 					for (int l = 0; l < 4; l++)
@@ -291,71 +291,65 @@ namespace FBXViewer
 					throw D3dtut::D3DException(L"Not phong material.");
 				}
 
-				try
+				FbxSurfacePhong* phongSurface = reinterpret_cast<FbxSurfacePhong*>(material);
+				D3dtut::Material ganda;
+				ganda.ambient.x = phongSurface->Ambient.Get()[0];
+				ganda.ambient.y = phongSurface->Ambient.Get()[1];
+				ganda.ambient.z = phongSurface->Ambient.Get()[2];
+				ganda.ambient.w = 1;
+
+				ganda.diffuse.x = phongSurface->Diffuse.Get()[0];
+				ganda.diffuse.y = phongSurface->Diffuse.Get()[1];
+				ganda.diffuse.z = phongSurface->Diffuse.Get()[2];
+				ganda.diffuse.w = 1;
+
+				ganda.specular.x = phongSurface->Specular.Get()[0];
+				ganda.specular.y = phongSurface->Specular.Get()[1];
+				ganda.specular.z = phongSurface->Specular.Get()[2];
+				ganda.specular.w = phongSurface->Shininess.Get();
+
+
+				std::wstring texName = L"";
+				if (fileIndex >= textureFilenames.size()) //if the file does not have an associated texture specified
 				{
-					FbxSurfacePhong* phongSurface = reinterpret_cast<FbxSurfacePhong*>(material);
-					D3dtut::Material ganda;
-					ganda.ambient.x = phongSurface->Ambient.Get()[0];
-					ganda.ambient.y = phongSurface->Ambient.Get()[1];
-					ganda.ambient.z = phongSurface->Ambient.Get()[2];
-					ganda.ambient.w = 1;
-
-					ganda.diffuse.x = phongSurface->Diffuse.Get()[0];
-					ganda.diffuse.y = phongSurface->Diffuse.Get()[1];
-					ganda.diffuse.z = phongSurface->Diffuse.Get()[2];
-					ganda.diffuse.w = 1;
-
-					ganda.specular.x = phongSurface->Specular.Get()[0];
-					ganda.specular.y = phongSurface->Specular.Get()[1];
-					ganda.specular.z = phongSurface->Specular.Get()[2];
-					ganda.specular.w = phongSurface->Shininess.Get();
-
-
-					std::wstring texName = L"";
-					if (fileIndex >= textureFilenames.size()) //if the file does not have an associated texture specified
+					auto fileTexture = phongSurface->Diffuse.GetSrcObject<FbxFileTexture>();
+					if (fileTexture == nullptr)
 					{
-						auto fileTexture = phongSurface->Diffuse.GetSrcObject<FbxFileTexture>();
-						if (fileTexture == nullptr)
-						{
-							throw D3dtut::D3DException(L"No associated texture for given FBX file.");
-						}
-
-						auto goo = fileTexture->GetRelativeFileName();
-						std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-						texName = converter.from_bytes(goo);
-					}
-					else
-					{
-						texName = textureFilenames[fileIndex];
-					}
-					
-					if (textures.find(textureFilenames[fileIndex]) == textures.end())
-					{
-						ID3D11Texture2D* tempTex;
-						ID3D11ShaderResourceView* tempsrv;
-						D3dtut::HR(
-							DirectX::CreateWICTextureFromFile(
-							device.get(),
-							texName.c_str(),
-							reinterpret_cast<ID3D11Resource**>(&tempTex),
-							&tempsrv));
-						*textures[texName].texture.address() = tempTex;
-						*textures[texName].shaderResourceView.address() = tempsrv;
+						throw D3dtut::D3DException(L"No associated texture for given FBX file.");
 					}
 
-					D3dtut::Model model(data.getId(), "mesh");
-					model.world = world;
-					model.material = ganda;
-					model.textureFilename = texName;
-					models.push_back(model);
-					geometryBufferData.Append(data);
+					auto goo = fileTexture->GetRelativeFileName();
+					std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+					texName = converter.from_bytes(goo);
 				}
-				catch (std::exception&)
+				else
 				{
-					//Do nothing.
+					texName = textureFilenames[fileIndex];
 				}
+
+				if (textures.find(textureFilenames[fileIndex]) == textures.end())
+				{
+					ID3D11Texture2D* tempTex;
+					ID3D11ShaderResourceView* tempsrv;
+					D3dtut::HR(
+						DirectX::CreateWICTextureFromFile(
+						device.get(),
+						texName.c_str(),
+						reinterpret_cast<ID3D11Resource**>(&tempTex),
+						&tempsrv));
+					*textures[texName].texture.address() = tempTex;
+					*textures[texName].shaderResourceView.address() = tempsrv;
+				}
+
+				D3dtut::Model model(data.getId(), "mesh");
+				model.world = world;
+				model.material = ganda;
+				model.textureFilename = texName;
+				models.push_back(model);
+				geometryBufferData.Append(data);
 			}
 		}
+
 
 		for (int i = 0; i < child->GetChildCount(); i++)
 		{
